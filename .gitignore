@@ -1,0 +1,28 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+
+# Foundry artifacts and deployment records
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+
+# Hosting, editor, and operating-system state
+.vercel/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local reference material
+Acunetix BOTChain Integration Guide.md
