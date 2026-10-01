@@ -8,4 +8,4 @@ optimizer = true
 optimizer_runs = 200
 
 [rpc_endpoints]
-botchain_testnet = "${BOTCHAIN_RPC_URL}"
+botchain_mainnet = "${BOTCHAIN_RPC_URL}"

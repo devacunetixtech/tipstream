@@ -10,7 +10,7 @@ export function friendlyWalletError(error: unknown, action = "complete this tran
     return "Your wallet does not have enough BOT for this payment and its network fee.";
   }
   if (includesAny(message, ["chain mismatch", "wrong network", "unsupported chain", "switch chain"])) {
-    return "Switch your wallet to BOT Chain testnet and try again.";
+    return "Switch your wallet to BOT Chain mainnet and try again.";
   }
   if (includesAny(message, ["invalidrecipient", "invalid recipient"])) {
     return "The recipient must be a different wallet from yours.";

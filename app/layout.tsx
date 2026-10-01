@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     default: "TipStream — Pay continuously on BOT Chain",
     template: "%s · TipStream",
   },
-  description: "Create live, second-by-second BOT payment streams on BOT Chain testnet.",
+  description: "Create live, second-by-second BOT payment streams on BOT Chain mainnet.",
   openGraph: {
     title: "TipStream",
     description: "BOT payments that settle every second.",

@@ -1,0 +1,119 @@
+name: Deploy TipStream to BOT Chain Mainnet
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tipstream-mainnet-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Test, deploy, and verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      BOTCHAIN_RPC_URL: https://rpc.botchain.ai
+      BOTCHAIN_VERIFIER_URL: https://scan.botchain.ai/api/
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Build contracts
+        run: forge build
+
+      - name: Run contract tests
+        run: forge test -vv
+
+      - name: Validate secrets and mainnet RPC
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          BLOCKSCOUT_API_KEY: ${{ secrets.BLOCKSCOUT_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_KEY" || { echo "PRIVATE_KEY secret is missing"; exit 1; }
+          test -n "$BLOCKSCOUT_API_KEY" || { echo "BLOCKSCOUT_API_KEY secret is missing"; exit 1; }
+          [[ "$PRIVATE_KEY" =~ ^(0x)?[0-9a-fA-F]{64}$ ]] || {
+            echo "PRIVATE_KEY must contain exactly 64 hexadecimal characters, optionally prefixed with 0x"
+            exit 1
+          }
+
+          chain_id="$(cast chain-id --rpc-url "$BOTCHAIN_RPC_URL")"
+          test "$chain_id" = "677" || {
+            echo "Expected BOT Chain mainnet chain ID 677, received $chain_id"
+            exit 1
+          }
+
+      - name: Deploy and verify TipStream
+        id: deploy
+        env:
+          RAW_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          BLOCKSCOUT_API_KEY: ${{ secrets.BLOCKSCOUT_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$RAW_PRIVATE_KEY" == 0x* ]]; then
+            export PRIVATE_KEY="$RAW_PRIVATE_KEY"
+          else
+            export PRIVATE_KEY="0x$RAW_PRIVATE_KEY"
+          fi
+          echo "::add-mask::$PRIVATE_KEY"
+
+          deployer_address="$(cast wallet address --private-key "$PRIVATE_KEY")"
+          deployer_balance="$(cast balance "$deployer_address" --rpc-url "$BOTCHAIN_RPC_URL")"
+          test "$deployer_balance" != "0" || {
+            echo "The deployer wallet $deployer_address has no BOT for mainnet gas"
+            exit 1
+          }
+          echo "Deploying from $deployer_address"
+
+          forge script script/DeployBotchain.s.sol:DeployBotchain \
+            --rpc-url "$BOTCHAIN_RPC_URL" \
+            --broadcast \
+            --verify \
+            --verifier blockscout \
+            --verifier-url "$BOTCHAIN_VERIFIER_URL" \
+            --verifier-api-key "$BLOCKSCOUT_API_KEY" \
+            --slow \
+            -vvvv
+
+          broadcast_file="broadcast/DeployBotchain.s.sol/677/run-latest.json"
+          contract_address="$(jq -r '[.transactions[] | select(.transactionType == "CREATE" and .contractName == "TipStream")][0].contractAddress // empty' "$broadcast_file")"
+          test -n "$contract_address" || {
+            echo "Deployment completed, but the TipStream address could not be read from $broadcast_file"
+            exit 1
+          }
+
+          deployed_code="$(cast code "$contract_address" --rpc-url "$BOTCHAIN_RPC_URL")"
+          test "$deployed_code" != "0x" || {
+            echo "No contract bytecode was found at $contract_address"
+            exit 1
+          }
+
+          echo "contract_address=$contract_address" >> "$GITHUB_OUTPUT"
+
+      - name: Write deployment summary
+        env:
+          CONTRACT_ADDRESS: ${{ steps.deploy.outputs.contract_address }}
+        run: |
+          {
+            echo "## TipStream mainnet deployment"
+            echo
+            echo "- Network: BOT Chain mainnet (chain ID 677)"
+            echo "- Contract: \`$CONTRACT_ADDRESS\`"
+            echo "- Explorer: https://scan.botchain.ai/address/$CONTRACT_ADDRESS?tab=contract"
+            echo
+            echo "Set \`NEXT_PUBLIC_TIPSTREAM_ADDRESS=$CONTRACT_ADDRESS\` in the frontend hosting environment and redeploy it."
+          } >> "$GITHUB_STEP_SUMMARY"

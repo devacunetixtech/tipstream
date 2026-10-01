@@ -3,7 +3,7 @@
 import { Check, CircleAlert, LogOut, Wallet, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
-import { botchainTestnet } from "@/lib/wagmi";
+import { botchainMainnet } from "@/lib/wagmi";
 
 const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
@@ -23,7 +23,7 @@ export function WalletButton({ label = "Connect wallet", onConnected }: Props) {
   const dialogTitleId = useId();
 
   useEffect(() => {
-    if (startedHere && isConnected && chainId === botchainTestnet.id) {
+    if (startedHere && isConnected && chainId === botchainMainnet.id) {
       onConnected?.();
       setStartedHere(false);
     }
@@ -53,9 +53,9 @@ export function WalletButton({ label = "Connect wallet", onConnected }: Props) {
     connect({ connector });
   }
 
-  if (isConnected && chainId !== botchainTestnet.id) {
+  if (isConnected && chainId !== botchainMainnet.id) {
     return (
-      <button type="button" className="wallet-button wrong-network" onClick={() => switchChain({ chainId: botchainTestnet.id })} disabled={switching}>
+      <button type="button" className="wallet-button wrong-network" onClick={() => switchChain({ chainId: botchainMainnet.id })} disabled={switching}>
         <CircleAlert size={17} /> {switching ? "Switching…" : "Switch network"}
       </button>
     );
@@ -98,7 +98,7 @@ export function WalletButton({ label = "Connect wallet", onConnected }: Props) {
                 <span className="online"><Check size={11} /></span>
                 <div>
                   <strong>{short(address)}</strong>
-                  <span>{activeConnector?.name ?? "Browser wallet"} · BOT Chain Testnet</span>
+                  <span>{activeConnector?.name ?? "Browser wallet"} · BOT Chain</span>
                 </div>
               </div>
               <p className="wallet-address">{address}</p>

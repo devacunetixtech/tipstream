@@ -13,7 +13,7 @@ import { WalletButton } from "./wallet-button";
 import { SiteFooter } from "./site-footer";
 import { isContractConfigured, type Stream, tipStreamAbi, tipStreamAddress } from "@/lib/contract";
 import { friendlyWalletError } from "@/lib/errors";
-import { botchainTestnet } from "@/lib/wagmi";
+import { botchainMainnet } from "@/lib/wagmi";
 
 type Filter = "active" | "incoming" | "completed";
 
@@ -40,7 +40,7 @@ export function Dashboard() {
   }, []);
 
   const loadStreams = useCallback(async () => {
-    if (!publicClient || !address || !isContractConfigured || chainId !== botchainTestnet.id) {
+    if (!publicClient || !address || !isContractConfigured || chainId !== botchainMainnet.id) {
       setStreams([]);
       return;
     }
@@ -65,7 +65,7 @@ export function Dashboard() {
   useEffect(() => { void loadStreams(); }, [loadStreams]);
 
   useEffect(() => {
-    if (!isConnected || chainId !== botchainTestnet.id) return;
+    if (!isConnected || chainId !== botchainMainnet.id) return;
     const timer = window.setInterval(() => void loadStreams(), 12_000);
     return () => window.clearInterval(timer);
   }, [chainId, isConnected, loadStreams]);
@@ -133,14 +133,14 @@ export function Dashboard() {
     );
   }
 
-  if (chainId !== botchainTestnet.id) {
+  if (chainId !== botchainMainnet.id) {
     return (
       <div className="access-screen">
         <div className="access-card">
           <Logo />
           <p className="section-index">NETWORK REQUIRED</p>
-          <h1>Switch to BOT Chain testnet.</h1>
-          <p>TipStream is currently deployed on testnet (chain ID 968). Switch networks to load your real streams.</p>
+          <h1>Switch to BOT Chain.</h1>
+          <p>TipStream runs on BOT Chain mainnet (chain ID 677). Switch networks to load your real streams.</p>
           <WalletButton />
           <Link className="back-link" href="/"><ArrowLeft size={15} /> Back to home</Link>
         </div>
@@ -153,13 +153,13 @@ export function Dashboard() {
       <header className="topbar">
         <Logo />
         <p className="app-title">Payment streams</p>
-        <div className="header-actions"><a className="testnet-pill" href="https://scan.bohr.life" target="_blank" rel="noreferrer"><span />BOT Testnet<ExternalLink size={13} /></a><WalletButton /></div>
+        <div className="header-actions"><a className="mainnet-pill" href="https://scan.botchain.ai" target="_blank" rel="noreferrer"><span />BOT Mainnet<ExternalLink size={13} /></a><WalletButton /></div>
       </header>
 
       <main id="dashboard">
         <section className="app-intro">
           <div><p className="section-index">BOT CHAIN TESTNET · LIVE DATA</p><h1>Your payment streams.</h1><p>Create a schedule, track accrued BOT, and settle from your wallet.</p></div>
-          <a className="contract-link" href={`https://scan.bohr.life/address/${tipStreamAddress}`} target="_blank" rel="noreferrer">View contract <ExternalLink size={14} /></a>
+          <a className="contract-link" href={`https://scan.botchain.ai/address/${tipStreamAddress}`} target="_blank" rel="noreferrer">View contract <ExternalLink size={14} /></a>
         </section>
 
         {!isContractConfigured ? <div className="config-banner"><span>TipStream is temporarily unavailable because its contract configuration is missing.</span></div> : null}

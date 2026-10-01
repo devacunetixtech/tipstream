@@ -23,7 +23,7 @@ export function LandingPage() {
         <Logo />
         <nav aria-label="Primary navigation">
           <a href="#how-it-works">How it works</a>
-          <a href="https://scan.bohr.life" target="_blank" rel="noreferrer">Testnet explorer</a>
+          <a href="https://scan.botchain.ai" target="_blank" rel="noreferrer">Mainnet explorer</a>
         </nav>
         {isConnected ? (
           <Link className="header-cta" href="/app">Open app <ArrowRight size={16} /></Link>
@@ -35,7 +35,7 @@ export function LandingPage() {
       <main className="landing-main">
         <section className="landing-hero">
           <div className="hero-copy">
-            <p className="kicker"><span /> Live on BOT Chain testnet</p>
+            <p className="kicker"><span /> Live on BOT Chain mainnet</p>
             <h1>Send BOT.<br />Let time do<br />the rest.</h1>
             <p className="hero-lede">TipStream releases a payment every second. The recipient withdraws what has accrued; you keep control of what has not.</p>
             <div className="hero-actions">

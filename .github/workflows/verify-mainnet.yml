@@ -1,0 +1,82 @@
+name: Verify TipStream on BOT Chain Mainnet
+
+on:
+  workflow_dispatch:
+    inputs:
+      contract_address:
+        description: Deployed TipStream contract address
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify existing deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      BOTCHAIN_RPC_URL: https://rpc.botchain.ai
+      BOTCHAIN_VERIFIER_URL: https://scan.botchain.ai/api/
+      CONTRACT_ADDRESS: ${{ inputs.contract_address }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Validate address and deployed code
+        env:
+          BLOCKSCOUT_API_KEY: ${{ secrets.BLOCKSCOUT_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$BLOCKSCOUT_API_KEY" || { echo "BLOCKSCOUT_API_KEY secret is missing"; exit 1; }
+          [[ "$CONTRACT_ADDRESS" =~ ^0x[0-9a-fA-F]{40}$ ]] || {
+            echo "contract_address must be a valid 0x-prefixed EVM address"
+            exit 1
+          }
+
+          chain_id="$(cast chain-id --rpc-url "$BOTCHAIN_RPC_URL")"
+          test "$chain_id" = "677" || {
+            echo "Expected BOT Chain mainnet chain ID 677, received $chain_id"
+            exit 1
+          }
+
+          deployed_code="$(cast code "$CONTRACT_ADDRESS" --rpc-url "$BOTCHAIN_RPC_URL")"
+          test "$deployed_code" != "0x" || {
+            echo "No contract bytecode was found at $CONTRACT_ADDRESS"
+            exit 1
+          }
+
+      - name: Build contract
+        run: forge build
+
+      - name: Verify with Blockscout
+        env:
+          BLOCKSCOUT_API_KEY: ${{ secrets.BLOCKSCOUT_API_KEY }}
+        run: |
+          forge verify-contract "$CONTRACT_ADDRESS" src/TipStream.sol:TipStream \
+            --chain 677 \
+            --rpc-url "$BOTCHAIN_RPC_URL" \
+            --verifier blockscout \
+            --verifier-url "$BOTCHAIN_VERIFIER_URL" \
+            --verifier-api-key "$BLOCKSCOUT_API_KEY" \
+            --watch
+
+      - name: Write verification summary
+        run: |
+          {
+            echo "## TipStream verification"
+            echo
+            echo "Verified \`$CONTRACT_ADDRESS\` on BOT Chain mainnet."
+            echo
+            echo "https://scan.botchain.ai/address/$CONTRACT_ADDRESS?tab=contract"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -98,8 +98,8 @@ button { color: inherit; }
 .topbar { position: relative; z-index: 10; }
 .app-title { margin: 0; font: 700 12px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
-.testnet-pill { min-height: 42px; padding: 0 12px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); font: 700 10px var(--font-mono); }
-.testnet-pill span { width: 7px; height: 7px; border-radius: 50%; background: var(--acid-dark); }
+.mainnet-pill { min-height: 42px; padding: 0 12px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); font: 700 10px var(--font-mono); }
+.mainnet-pill span { width: 7px; height: 7px; border-radius: 50%; background: var(--acid-dark); }
 .app-shell > main { width: min(1120px, calc(100% - 48px)); margin: 0 auto; padding-bottom: 100px; }
 .app-intro { min-height: 235px; display: flex; justify-content: space-between; align-items: flex-end; gap: 30px; padding: 60px 0 35px; border-bottom: 1px solid var(--ink); }
 .app-intro .section-index { margin-bottom: 14px; color: var(--muted); }
@@ -216,7 +216,7 @@ button { color: inherit; }
   .app-intro { min-height: 210px; align-items: flex-start; flex-direction: column; }
   .stats-grid { grid-template-columns: 1fr; border-top: 1px solid var(--ink); }
   .stat-card { border-top: 0; border-left: 1px solid var(--ink); }
-  .testnet-pill { display: none; }
+  .mainnet-pill { display: none; }
   .topbar .wallet-button > span:not(.online) { display: none; }
   .duration-row { grid-template-columns: 1fr 108px; }
   .toast { right: 14px; bottom: 14px; max-width: calc(100% - 28px); }

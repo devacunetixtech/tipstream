@@ -9,7 +9,7 @@ TipStream is a programmable native-BOT payment streaming MVP for BOT Chain. A se
 - Next.js, React, and TypeScript
 - wagmi + viem for wallet and contract interactions
 - Solidity 0.8.28 and Foundry
-- BOT Chain testnet (chain ID `968`)
+- BOT Chain mainnet (chain ID `677`)
 
 ## Local setup
 
@@ -22,7 +22,7 @@ npm run contracts:test
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The public landing page is available to everyone; `/app` requires a connected wallet on BOT Chain testnet. There are no mock records or simulated transactions.
+Open [http://localhost:3000](http://localhost:3000). The public landing page is available to everyone; `/app` requires a connected wallet on BOT Chain mainnet. There are no mock records or simulated transactions.
 
 ## Contract behavior
 
@@ -45,16 +45,35 @@ npm run contracts:test
 
 The tests cover creation, boundary and midpoint calculations, incremental withdrawal, cancellation/refunds, rounding, authorization, and invalid parameters.
 
-To deploy to BOT Chain testnet:
+### GitHub Actions deployment (recommended)
+
+Add these repository secrets under **Settings → Secrets and variables → Actions**:
+
+- `PRIVATE_KEY` — the funded deployer wallet private key, with or without the `0x` prefix
+- `BLOCKSCOUT_API_KEY` — the API key used to verify on BOTScan
+
+Then open **Actions → Deploy TipStream to BOT Chain Mainnet → Run workflow**. The workflow tests the contract, confirms that the RPC reports chain ID `677`, deploys, verifies through Blockscout, and writes the deployed address and explorer link to the workflow summary.
+
+If deployment succeeds but verification needs to be retried, run **Verify TipStream on BOT Chain Mainnet** and enter the deployed contract address. This does not redeploy the contract.
+
+### Local deployment
+
+To deploy and verify locally:
 
 ```bash
-export BOTCHAIN_RPC_URL=https://rpc.bohr.life
+export BOTCHAIN_RPC_URL=https://rpc.botchain.ai
+export BOTCHAIN_VERIFIER_URL=https://scan.botchain.ai/api/
 export PRIVATE_KEY=<private-key-as-hex-or-integer>
+export BLOCKSCOUT_API_KEY=<blockscout-api-key>
 
 cd contracts
 forge script script/DeployBotchain.s.sol:DeployBotchain \
   --rpc-url "$BOTCHAIN_RPC_URL" \
   --broadcast \
+  --verify \
+  --verifier blockscout \
+  --verifier-url "$BOTCHAIN_VERIFIER_URL" \
+  --verifier-api-key "$BLOCKSCOUT_API_KEY" \
   --slow
 ```
 
@@ -64,7 +83,7 @@ Copy the deployed address into `.env.local`:
 NEXT_PUBLIC_TIPSTREAM_ADDRESS=0xYourDeployedAddress
 ```
 
-Restart the Next.js development server after changing public environment variables. Test BOT is available from [the BOT Chain faucet](https://faucet.botchain.ai).
+Set the same variable in the hosting environment and redeploy the frontend. Restart the Next.js development server after changing public environment variables.
 
 ### Optional contract verification
 
@@ -82,20 +101,20 @@ forge verify-contract <deployed-address> src/TipStream.sol:TipStream \
 
 | Variable | Used by | Description |
 | --- | --- | --- |
-| `NEXT_PUBLIC_TIPSTREAM_ADDRESS` | Web app | Deployed TipStream address on chain 968 |
+| `NEXT_PUBLIC_TIPSTREAM_ADDRESS` | Web app | Deployed TipStream address on chain 677 |
 | `NEXT_PUBLIC_SITE_URL` | Web app | Canonical public URL used for social metadata |
-| `BOTCHAIN_RPC_URL` | Foundry | Testnet RPC; defaults conceptually to `https://rpc.bohr.life` |
+| `BOTCHAIN_RPC_URL` | Foundry | Mainnet RPC: `https://rpc.botchain.ai` |
 | `PRIVATE_KEY` | Foundry | Deployment key; never expose it to the browser or commit it |
 | `BLOCKSCOUT_API_KEY` | Foundry | API key supplied to the Blockscout verifier |
 | `BOTCHAIN_VERIFIER_URL` | Foundry | Blockscout API URL used for verification |
 
 ## Network
 
-| Setting | BOT Chain testnet |
+| Setting | BOT Chain mainnet |
 | --- | --- |
-| Chain ID | `968` |
+| Chain ID | `677` |
 | Native token | `BOT` |
-| RPC | `https://rpc.bohr.life` |
-| Explorer | `https://scan.bohr.life` |
+| RPC | `https://rpc.botchain.ai` |
+| Explorer | `https://scan.botchain.ai` |
 
 Only the integration parameters above were taken from the supplied BOT Chain integration guide; product behavior and implementation are defined by this project.

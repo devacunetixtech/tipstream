@@ -2,19 +2,18 @@ import { createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { defineChain } from "viem";
 
-export const botchainTestnet = defineChain({
-  id: 968,
-  name: "BOT Chain Testnet",
+export const botchainMainnet = defineChain({
+  id: 677,
+  name: "BOT Chain",
   nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.bohr.life"] } },
-  blockExplorers: { default: { name: "BOTScan", url: "https://scan.bohr.life" } },
-  testnet: true,
+  rpcUrls: { default: { http: ["https://rpc.botchain.ai"] } },
+  blockExplorers: { default: { name: "BOTScan", url: "https://scan.botchain.ai" } },
 });
 
 export const wagmiConfig = createConfig({
-  chains: [botchainTestnet],
+  chains: [botchainMainnet],
   connectors: [injected()],
-  transports: { [botchainTestnet.id]: http() },
+  transports: { [botchainMainnet.id]: http() },
   ssr: true,
 });
 

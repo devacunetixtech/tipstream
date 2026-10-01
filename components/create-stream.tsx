@@ -6,7 +6,7 @@ import { isAddress, parseEther } from "viem";
 import { useAccount, useChainId, useWriteContract } from "wagmi";
 import { isContractConfigured, tipStreamAbi, tipStreamAddress } from "@/lib/contract";
 import { friendlyWalletError } from "@/lib/errors";
-import { botchainTestnet } from "@/lib/wagmi";
+import { botchainMainnet } from "@/lib/wagmi";
 
 const units = { minutes: 60, hours: 3_600, days: 86_400 } as const;
 
@@ -27,7 +27,7 @@ export function CreateStream({ onSubmitted, onNotice }: Props) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isConnected) return onNotice("Connect your wallet to create a stream.", true);
-    if (chainId !== botchainTestnet.id) return onNotice("Switch your wallet to BOT Chain testnet before creating a stream.", true);
+    if (chainId !== botchainMainnet.id) return onNotice("Switch your wallet to BOT Chain before creating a stream.", true);
     if (!isContractConfigured) return onNotice("TipStream is temporarily unavailable while its contract configuration is restored.", true);
     if (!isAddress(recipient)) return onNotice("Enter a valid recipient address.", true);
     if (recipient.toLowerCase() === address?.toLowerCase()) return onNotice("Choose a recipient wallet other than your own.", true);
