@@ -56,6 +56,14 @@ Then open **Actions → Deploy TipStream to BOT Chain Mainnet → Run workflow**
 
 If deployment succeeds but verification needs to be retried, run **Verify TipStream on BOT Chain Mainnet** and enter the deployed contract address. This does not redeploy the contract.
 
+### Six-wallet test interactions
+
+The manual **Run Six TipStream Test Wallets** workflow generates six temporary wallets inside the GitHub runner. The wallet stored in the `PRIVATE_KEY` repository secret funds each temporary wallet with the estimated transaction gas plus a 20% gas-limit margin and a 1-wei stream deposit. Each temporary wallet then calls `createStream` once on the supplied mainnet contract address.
+
+Run it from **Actions → Run Six TipStream Test Wallets → Run workflow**, then enter the deployed TipStream address. The six wallet addresses and transaction links are written to the workflow summary. Temporary private keys are masked, stored only in a restricted temporary file, and deleted before the runner exits.
+
+These addresses are controlled test wallets, not independent users. Do not represent them as unique community users if an ecosystem or incentive programme requires interactions from separate people.
+
 ### Local deployment
 
 To deploy and verify locally:

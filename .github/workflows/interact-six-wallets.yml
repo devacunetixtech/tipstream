@@ -1,0 +1,172 @@
+name: Run Six TipStream Test Wallets
+
+on:
+  workflow_dispatch:
+    inputs:
+      contract_address:
+        description: Deployed TipStream mainnet contract address
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tipstream-six-wallet-interactions
+  cancel-in-progress: false
+
+jobs:
+  interact:
+    name: Fund and interact with six temporary wallets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BOTCHAIN_RPC_URL: https://rpc.botchain.ai
+      BOTCHAIN_EXPLORER_URL: https://scan.botchain.ai
+      CONTRACT_ADDRESS: ${{ inputs.contract_address }}
+      STREAM_VALUE_WEI: "1"
+      STREAM_DURATION_SECONDS: "60"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Validate configuration
+        env:
+          RAW_FUNDER_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          test -n "$RAW_FUNDER_PRIVATE_KEY" || {
+            echo "PRIVATE_KEY repository secret is missing"
+            exit 1
+          }
+          [[ "$RAW_FUNDER_PRIVATE_KEY" =~ ^(0x)?[0-9a-fA-F]{64}$ ]] || {
+            echo "PRIVATE_KEY must contain exactly 64 hexadecimal characters, optionally prefixed with 0x"
+            exit 1
+          }
+          [[ "$CONTRACT_ADDRESS" =~ ^0x[0-9a-fA-F]{40}$ ]] || {
+            echo "contract_address must be a valid 0x-prefixed EVM address"
+            exit 1
+          }
+
+          chain_id="$(cast chain-id --rpc-url "$BOTCHAIN_RPC_URL")"
+          test "$chain_id" = "677" || {
+            echo "Expected BOT Chain mainnet chain ID 677, received $chain_id"
+            exit 1
+          }
+
+          deployed_code="$(cast code "$CONTRACT_ADDRESS" --rpc-url "$BOTCHAIN_RPC_URL")"
+          test "$deployed_code" != "0x" || {
+            echo "No contract bytecode was found at $CONTRACT_ADDRESS"
+            exit 1
+          }
+
+      - name: Create six streams from temporary wallets
+        env:
+          RAW_FUNDER_PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          if [[ "$RAW_FUNDER_PRIVATE_KEY" == 0x* ]]; then
+            funder_private_key="$RAW_FUNDER_PRIVATE_KEY"
+          else
+            funder_private_key="0x$RAW_FUNDER_PRIVATE_KEY"
+          fi
+          echo "::add-mask::$funder_private_key"
+
+          funder_address="$(cast wallet address --private-key "$funder_private_key")"
+          gas_price="$(cast gas-price --rpc-url "$BOTCHAIN_RPC_URL")"
+          estimated_gas="$(cast estimate \
+            --rpc-url "$BOTCHAIN_RPC_URL" \
+            --from "$funder_address" \
+            --value "$STREAM_VALUE_WEI" \
+            "$CONTRACT_ADDRESS" \
+            "createStream(address,uint40)" \
+            "0x000000000000000000000000000000000000dEaD" \
+            "$STREAM_DURATION_SECONDS")"
+
+          # Gas limit does not determine the charged fee; unused gas is not charged.
+          # A 20% limit margin protects against small state-dependent estimate changes.
+          interaction_gas_limit=$(( (estimated_gas * 120 + 99) / 100 ))
+          wallet_funding_wei=$(( interaction_gas_limit * gas_price + STREAM_VALUE_WEI ))
+          results_file="$(mktemp)"
+          keys_file="$(mktemp)"
+
+          cleanup() {
+            if command -v shred >/dev/null 2>&1; then
+              shred -u "$keys_file" 2>/dev/null || true
+            else
+              rm -f "$keys_file"
+            fi
+            rm -f "$results_file"
+          }
+          trap cleanup EXIT
+
+          echo "Funder: $funder_address"
+          echo "Gas price: $gas_price wei"
+          echo "Estimated createStream gas: $estimated_gas"
+          echo "Funding each temporary wallet with $wallet_funding_wei wei"
+
+          for wallet_number in 1 2 3 4 5 6; do
+            wallet_json="$(cast wallet new --json)"
+            wallet_address="$(jq -r '.[0].address' <<<"$wallet_json")"
+            wallet_private_key="$(jq -r '.[0].private_key' <<<"$wallet_json")"
+            echo "::add-mask::$wallet_private_key"
+            printf '%s\t%s\n' "$wallet_address" "$wallet_private_key" >> "$keys_file"
+
+            funding_receipt="$(cast send "$wallet_address" \
+              --rpc-url "$BOTCHAIN_RPC_URL" \
+              --private-key "$funder_private_key" \
+              --legacy \
+              --gas-price "$gas_price" \
+              --gas-limit 21000 \
+              --value "$wallet_funding_wei" \
+              --json)"
+            funding_tx="$(jq -r '.transactionHash' <<<"$funding_receipt")"
+
+            interaction_receipt="$(cast send "$CONTRACT_ADDRESS" \
+              "createStream(address,uint40)" \
+              "$funder_address" \
+              "$STREAM_DURATION_SECONDS" \
+              --rpc-url "$BOTCHAIN_RPC_URL" \
+              --private-key "$wallet_private_key" \
+              --legacy \
+              --gas-price "$gas_price" \
+              --gas-limit "$interaction_gas_limit" \
+              --value "$STREAM_VALUE_WEI" \
+              --json)"
+            interaction_tx="$(jq -r '.transactionHash' <<<"$interaction_receipt")"
+            interaction_status="$(jq -r '.status' <<<"$interaction_receipt")"
+
+            [[ "$interaction_status" == "0x1" || "$interaction_status" == "1" ]] || {
+              echo "Wallet $wallet_number interaction reverted: $interaction_tx"
+              exit 1
+            }
+
+            printf '%s\t%s\t%s\t%s\n' \
+              "$wallet_number" "$wallet_address" "$funding_tx" "$interaction_tx" >> "$results_file"
+            echo "Wallet $wallet_number completed: $wallet_address"
+          done
+
+          {
+            echo "## Six TipStream test-wallet interactions"
+            echo
+            echo "- Network: BOT Chain mainnet (chain ID 677)"
+            echo "- Contract: [$CONTRACT_ADDRESS]($BOTCHAIN_EXPLORER_URL/address/$CONTRACT_ADDRESS)"
+            echo "- Stream value: $STREAM_VALUE_WEI wei per wallet"
+            echo "- Duration: $STREAM_DURATION_SECONDS seconds"
+            echo "- Wallet type: Temporary workflow-generated test wallets"
+            echo
+            echo "| # | Wallet | Funding transaction | Interaction transaction |"
+            echo "|---:|---|---|---|"
+            while IFS=$'\t' read -r number address funding_tx interaction_tx; do
+              echo "| $number | [\`$address\`]($BOTCHAIN_EXPLORER_URL/address/$address) | [View]($BOTCHAIN_EXPLORER_URL/tx/$funding_tx) | [View]($BOTCHAIN_EXPLORER_URL/tx/$interaction_tx) |"
+            done < "$results_file"
+          } >> "$GITHUB_STEP_SUMMARY"
