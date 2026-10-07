@@ -28,7 +28,10 @@ export function friendlyWalletError(error: unknown, action = "complete this tran
     return "This wallet is not allowed to perform that action.";
   }
   if (includesAny(message, ["failed to fetch", "network error", "timeout"])) {
-    return "BOT Chain is taking too long to respond. Check your connection and try again.";
+    return "BOT Chain is taking too long to respond. Check your wallet activity before trying again to avoid a duplicate transaction.";
   }
-  return `We could not ${action}. Your funds have not moved. Please try again.`;
+  if (includesAny(message, ["transaction reverted", "execution reverted"])) {
+    return "The transaction was rejected on-chain. The requested action did not complete, although a network fee may have been charged.";
+  }
+  return `We could not confirm whether ${action} completed. Check your wallet activity before trying again.`;
 }

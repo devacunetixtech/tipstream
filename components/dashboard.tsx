@@ -39,24 +39,44 @@ export function Dashboard() {
     window.setTimeout(() => setNotice(null), 5_000);
   }, []);
 
-  const loadStreams = useCallback(async () => {
+  const loadStreams = useCallback(async (showRefreshError = true): Promise<boolean> => {
     if (!publicClient || !address || !isContractConfigured || chainId !== botchainMainnet.id) {
       setStreams([]);
-      return;
+      return true;
     }
     setLoading(true);
     try {
       const count = await publicClient.readContract({ address: tipStreamAddress, abi: tipStreamAbi, functionName: "nextStreamId" });
       const start = count > 200n ? count - 200n : 0n;
-      const rows = await Promise.all(Array.from({ length: Number(count - start) }, async (_, index) => {
-        const id = start + BigInt(index);
-        const data = await publicClient.readContract({ address: tipStreamAddress, abi: tipStreamAbi, functionName: "getStream", args: [id] });
-        return { id, ...data, startTime: Number(data.startTime), endTime: Number(data.endTime), canceledAt: Number(data.canceledAt) } satisfies Stream;
-      }));
+      const ids = Array.from({ length: Number(count - start) }, (_, index) => start + BigInt(index));
+      const rows: Stream[] = [];
+      let failedReads = 0;
+
+      // BOT Chain's public RPC can reject a large burst of reads. Small batches,
+      // plus allSettled, keep one flaky response from hiding every valid stream.
+      for (let offset = 0; offset < ids.length; offset += 10) {
+        const results = await Promise.allSettled(ids.slice(offset, offset + 10).map(async (id) => {
+          const data = await publicClient.readContract({ address: tipStreamAddress, abi: tipStreamAbi, functionName: "getStream", args: [id] });
+          return { id, ...data, startTime: Number(data.startTime), endTime: Number(data.endTime), canceledAt: Number(data.canceledAt) } satisfies Stream;
+        }));
+
+        for (const result of results) {
+          if (result.status === "fulfilled") rows.push(result.value);
+          else failedReads += 1;
+        }
+      }
+
       const account = address.toLowerCase();
       setStreams(rows.filter((stream) => stream.sender.toLowerCase() === account || stream.recipient.toLowerCase() === account).reverse());
-    } catch (error) {
-      showNotice(friendlyWalletError(error, "load your streams"), true);
+      if (failedReads > 0 && showRefreshError) {
+        showNotice(`Loaded the available streams, but ${failedReads} could not be refreshed. Try again shortly.`, true);
+      }
+      return failedReads === 0;
+    } catch {
+      if (showRefreshError) {
+        showNotice("We couldn't refresh your streams right now. Your on-chain streams are unchanged. Try again shortly.", true);
+      }
+      return false;
     } finally {
       setLoading(false);
     }
@@ -72,9 +92,12 @@ export function Dashboard() {
 
   const onSubmitted = useCallback(async (hash: `0x${string}`) => {
     if (!publicClient) return;
-    await publicClient.waitForTransactionReceipt({ hash });
-    showNotice("Stream created successfully.");
-    await loadStreams();
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error("Transaction reverted");
+    const refreshed = await loadStreams(false);
+    showNotice(refreshed
+      ? "Stream created successfully."
+      : "Stream created successfully on-chain, but the list has not refreshed yet. Try refreshing shortly.");
   }, [loadStreams, publicClient, showNotice]);
 
   async function streamAction(action: "withdraw" | "cancel", id: bigint) {
@@ -83,9 +106,11 @@ export function Dashboard() {
     try {
       const hash = await writeContractAsync({ address: tipStreamAddress, abi: tipStreamAbi, functionName: action, args: [id] });
       showNotice("Transaction submitted. Waiting for confirmation…");
-      await publicClient.waitForTransactionReceipt({ hash });
-      showNotice(action === "withdraw" ? "Available BOT withdrawn." : "Stream canceled and unvested BOT refunded.");
-      await loadStreams();
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") throw new Error("Transaction reverted");
+      const refreshed = await loadStreams(false);
+      const confirmation = action === "withdraw" ? "Available BOT withdrawn." : "Stream canceled and unvested BOT refunded.";
+      showNotice(refreshed ? confirmation : `${confirmation} The list has not refreshed yet.`);
     } catch (error) {
       showNotice(friendlyWalletError(error, action === "withdraw" ? "withdraw this BOT" : "cancel this stream"), true);
     } finally {
@@ -158,7 +183,7 @@ export function Dashboard() {
 
       <main id="dashboard">
         <section className="app-intro">
-          <div><p className="section-index">BOT CHAIN TESTNET · LIVE DATA</p><h1>Your payment streams.</h1><p>Create a schedule, track accrued BOT, and settle from your wallet.</p></div>
+          <div><p className="section-index">BOT CHAIN MAINNET · LIVE DATA</p><h1>Your payment streams.</h1><p>Create a schedule, track accrued BOT, and settle from your wallet.</p></div>
           <a className="contract-link" href={`https://scan.botchain.ai/address/${tipStreamAddress}`} target="_blank" rel="noreferrer">View contract <ExternalLink size={14} /></a>
         </section>
 
